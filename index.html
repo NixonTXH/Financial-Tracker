@@ -270,7 +270,7 @@ function review(){
 function renderRev(){
  const {c,p,cats,adv}=review();
  $('#rev').innerHTML=`<h2>Monthly overview</h2><input type="month" value="${revM}" onchange="revM=this.value||revM;renderRev()">
- ${pieCard(c)}
+ <div class="two">${pieCard(c)}${nwPie()}</div>
  <div class="card"><b>Net: ${money(c.inc-c.exp)}</b><div class="mut">Last month: income ${money(p.inc)}, expenses ${money(p.exp)}</div></div>
  <div class="card"><span class="mut">Monthly debt repayments</span><br><b class="e">${money(debtMonthly())}</b>${c.inc?' <span class="mut">('+Math.round(debtMonthly()/c.inc*100)+'% of income)</span>':''}</div>
  ${chartHTML()}
@@ -411,7 +411,7 @@ function aiData(){
   creditCards:ACCTS.filter(x=>x[1]==='card').map(([a])=>{const i=cardInfo(a);return {name:a,owed:r2(-bal(a)),limit:S.lim[a]||0,lastStatement:i?r2(i.last):null,paymentDue:i?iso(i.due):null}}),
   accounts:ACCTS.filter(x=>x[1]!=='card').map(([a])=>({name:a,balance:r2(bal(a))})),
   debts:S.debts.filter(x=>paidCount(x)<x.m).map(x=>({type:dLab(x.k),monthly:x.pm,remaining:r2(remain(x)),monthsLeft:x.m-paidCount(x)})),
-  investments:S.inv.map(h=>({name:h.n,value:r2(h.q*invPx(h))})),recurringDueIn14Days:S.rec.filter(r=>days(r.due)<=14).map(r=>({name:r.n,amount:r.a,due:r.due}))}}
+  netWorth:r2(netWorth().nw),investments:S.inv.map(h=>({name:h.n,value:r2(h.q*invPx(h))})),recurringDueIn14Days:S.rec.filter(r=>days(r.due)<=14).map(r=>({name:r.n,amount:r.a,due:r.due}))}}
 async function runAI(man){const c=S.cfg||{};
  if(!c.url||!c.key){if(man)alert('Paste your Worker URL and app password under Settings, tap Save settings, then try again.');return}
  const el=$('#aiT');if(el)el.textContent='Reviewing your finances…';
@@ -452,22 +452,37 @@ function goalPie(g,now){const s=goalStat(g,now),pc=s.pct,C=157.08,over=g.k==='ca
  <div class="mut">${g.k==='cap'?'Spend limit'+(g.s==='all'?'':' · '+g.s):g.k==='inc'?'Income goal':'Savings goal'}</div><div class="mut">${s.st}</div><button class="x" onclick="delGoal(${g.id})">✕ Delete</button></div>`}
 
 /* ---------- OVERVIEW PIE ---------- */
-function pieCard(c){const t=c.inc+c.exp,C=157.08,f=t>0?c.inc/t*C:0,pc=v=>t?` <span class="mut">${Math.round(v/t*100)}%</span>`:'';
- return `<div class="card" style="display:flex;align-items:center;gap:14px"><svg viewBox="0 0 100 100" width="120" height="120" style="flex:none"><circle cx="50" cy="50" r="50" fill="${t>0?'#c0392b':'var(--line)'}"/>${t>0?`<circle cx="50" cy="50" r="25" fill="none" stroke="#2e9e6b" stroke-width="50" stroke-dasharray="${f} ${C}" transform="rotate(-90 50 50)"/>`:''}</svg>
- <div><div><span style="color:#2e9e6b">●</span> Income<br><b style="color:#2e9e6b">${money(c.inc)}</b>${pc(c.inc)}</div>
- <div style="margin-top:8px"><span style="color:#c0392b">●</span> Expenses<br><b style="color:#c0392b">${money(c.exp)}</b>${pc(c.exp)}</div></div></div>`}
+function pieCard(c){const t=c.inc+c.exp,lg=(col,l,x)=>`<div style="margin-top:4px;font-size:13px"><span style="color:${col}">●</span> ${l}<br><b style="color:${col}">${money(x)}</b>${t?` <span class="mut">${Math.round(x/t*100)}%</span>`:''}</div>`;
+ return `<div class="card" style="margin:8px 0"><div class="mut" style="text-align:center">Income vs expenses</div><div style="text-align:center;font-weight:700;color:${c.inc-c.exp>=0?'#2e9e6b':'#c0392b'}">Net ${money(c.inc-c.exp)}</div>${pieSvg([c.inc,c.exp],['#2e9e6b','#c0392b'])}${lg('#2e9e6b','Income',c.inc)}${lg('#c0392b','Expenses',c.exp)}</div>`}
 
 /* ---------- INVESTMENTS ---------- */
 let pxTry=0;
-const invPx=h=>h.t==='Crypto'?((S.px[h.cid]||{}).p||0):(h.px||0);
+function netWorth(){const A=k=>ACCTS.filter(x=>k(x[1])).map(x=>x[0]),cb=A(k=>k!=='card').reduce((q,a)=>q+bal(a),0),cd=A(k=>k==='card').reduce((q,a)=>q-bal(a),0),
+ inv=S.inv.reduce((q,h)=>q+h.q*invPx(h),0),ln=S.debts.reduce((q,d)=>q+remain(d),0);return {cb,cd,inv,ln,nw:cb+inv-cd-ln}}
+function pieSvg(v,col){const t=v.reduce((q,x)=>q+x,0),C=157.08;let o=0;
+ return `<svg viewBox="0 0 100 100" width="100" height="100" style="display:block;margin:6px auto"><circle cx="50" cy="50" r="50" style="fill:var(--line)"/>${t>0?v.map((x,i)=>{const l=x/t*C,e=x>0?`<circle cx="50" cy="50" r="25" fill="none" stroke="${col[i]}" stroke-width="50" stroke-dasharray="${l} ${C}" stroke-dashoffset="${-o}" transform="rotate(-90 50 50)"/>`:'';o+=l;return e}).join(''):''}</svg>`}
+function nwPie(){const n=netWorth(),v=[n.inv,Math.max(n.cb,0),Math.max(n.cd,0),n.ln],col=['#2e9e6b','#3b82c4','#c0392b','#e0a030'],t=v.reduce((q,x)=>q+x,0);
+ const lg=(i,l,x)=>`<div style="margin-top:4px;font-size:13px"><span style="color:${col[i]}">●</span> ${l}<br><b style="color:${col[i]}">${money(x)}</b>${t&&v[i]>0?` <span class="mut">${Math.round(v[i]/t*100)}%</span>`:''}</div>`;
+ return `<div class="card" style="margin:8px 0"><div class="mut" style="text-align:center">Net worth (today)</div><div style="text-align:center;font-weight:700;color:${n.nw>=0?'#2e9e6b':'#c0392b'}">${money(n.nw)}</div>${pieSvg(v,col)}${lg(0,'Investments',n.inv)}${lg(1,'Cash and banks',n.cb)}${lg(2,'Cards owed',n.cd)}${lg(3,'Loans owing',n.ln)}</div>`}
+const fxr=()=>(S.fx&&S.fx.r)||1.3;
+const invPx=h=>h.t==='Crypto'?((S.px[h.cid]||{}).u||0)*fxr():(h.px||0);
+const COINS="Bitcoin:BTC,Ethereum:ETH,Tether:USDT,XRP:XRP,BNB:BNB,Solana:SOL,USDC:USDC,TRON:TRX,Dogecoin:DOGE,Cardano:ADA,Hyperliquid:HYPE,Chainlink:LINK,Bitcoin Cash:BCH,Stellar:XLM,Avalanche:AVAX,Sui:SUI,Hedera:HBAR,Litecoin:LTC,Shiba Inu:SHIB,Toncoin:TON,Monero:XMR,Polkadot:DOT,Cronos:CRO,Uniswap:UNI,Ethena:ENA,Aave:AAVE,Pepe:PEPE,NEAR Protocol:NEAR,Internet Computer:ICP,Ethereum Classic:ETC,Aptos:APT,Ondo:ONDO,Bittensor:TAO,Arbitrum:ARB,Algorand:ALGO,Polygon (POL):POL,VeChain:VET,Cosmos:ATOM,Filecoin:FIL,Render:RENDER,Kaspa:KAS,Worldcoin:WLD,Optimism:OP,Injective:INJ,Sei:SEI,Jupiter:JUP,Bonk:BONK,Fetch.ai:FET,Celestia:TIA,Stacks:STX,The Graph:GRT,Immutable:IMX,Quant:QNT,Curve DAO:CRV,Lido DAO:LDO,Theta Network:THETA,The Sandbox:SAND,Decentraland:MANA,Axie Infinity:AXS,Flow:FLOW,Tezos:XTZ,NEO:NEO,IOTA:IOTA,Gala:GALA,Chiliz:CHZ,Pyth Network:PYTH,JasmyCoin:JASMY,Ethereum Name Service:ENS,Compound:COMP,Synthetix:SNX,1inch:1INCH,dYdX:DYDX,Maker:MKR,Pendle:PENDLE,Raydium:RAY,FLOKI:FLOKI,dogwifhat:WIF,Arweave:AR,Mantle:MNT,Aerodrome:AERO,Zcash:ZEC,Dash:DASH,Basic Attention Token:BAT,Livepeer:LPT,Ravencoin:RVN,Zilliqa:ZIL,Ankr:ANKR,Kava:KAVA,Loopring:LRC,Mina:MINA,Helium:HNT,Axelar:AXL,Wormhole:W,LayerZero:ZRO,EigenLayer:EIGEN,Pudgy Penguins:PENGU,Official Trump:TRUMP,Berachain:BERA,Virtuals Protocol:VIRTUAL".split(',').map(x=>{const [n,c]=x.split(':');return {n,s:c}});
+if(!S.pxv2){S.px={};S.top=[];S.inv.forEach(h=>{if(h.t==='Crypto')h.cid=h.sym});S.pxv2=1;save()}
+async function getTickers(){const u='https://api.crypto.com/exchange/v1/public/get-tickers';
+ try{const r=await fetch(u);if(!r.ok)throw 0;return (await r.json()).result.data}
+ catch(e){const c=S.cfg||{};if(!c.url)throw new Error('could not reach Crypto.com. Set up the Worker in Overview > AI weekly insights > Settings so it can fetch prices for you');
+  const r=await fetch(c.url+(c.url.includes('?')?'&':'?')+'prices=1',{headers:{'X-App-Key':c.key}});if(!r.ok)throw new Error('price service error '+r.status);return (await r.json()).result.data}}
 async function fetchPrices(){
  const st=$('#invst');if(st)st.textContent='Updating prices…';
- try{const r=await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=sgd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h');
-  if(!r.ok)throw new Error(r.status===429?'too many requests, try again in a minute':'error '+r.status);
-  const j=await r.json();S.top=j.map(c=>({id:c.id,sym:c.symbol.toUpperCase(),n:c.name,rank:c.market_cap_rank}));
-  j.forEach(c=>S.px[c.id]={p:c.current_price,ch:c.price_change_percentage_24h});S.pxTs=Date.now();save()}
+ try{const T=await getTickers(),m={};
+  T.forEach(t=>{const [b,q]=String(t.i).split('_');if(!q||!['USD','USDC','USDT'].includes(q))return;const u=parseFloat(t.a);if(!(u>0))return;const pr={USD:0,USDC:1,USDT:2}[q];if(!m[b]||pr<m[b].pr)m[b]={u,ch:parseFloat(t.c)*100||0,pr}});
+  ['USDT','USDC'].forEach(x=>{if(!m[x])m[x]={u:1,ch:0,pr:9}});
+  Object.keys(m).forEach(k=>S.px[k]={u:m[k].u,ch:m[k].ch});S.avail=Object.keys(m);S.pxTs=Date.now();
+  if(!(S.fx&&S.fx.man))try{const j=await (await fetch('https://open.er-api.com/v6/latest/USD')).json();if(j.rates&&j.rates.SGD)S.fx={r:j.rates.SGD,auto:1}}catch(e){}
+  save()}
  catch(e){const m=$('#invst');if(m)m.textContent='Could not update prices ('+e.message+'). Showing the last saved prices.';return}
- if(tab==='inv'&&!($('#iq')&&$('#iq').value))renderInv();else{const m=$('#invst');if(m)m.textContent='Prices updated.'}}
+ if(tab==='inv'&&!($('#iq')&&$('#iq').value))renderInv();else if(tab==='rev')renderRev();else{const m=$('#invst');if(m)m.textContent='Prices updated.'}}
+function setFx(v){const r=parseFloat(v);if(r>0){S.fx={r,man:1};save();renderInv()}}
 function renderInv(){
  if((!S.pxTs||Date.now()-S.pxTs>3e5)&&Date.now()-pxTry>6e4){pxTry=Date.now();fetchPrices()}
  const tot=S.inv.reduce((q,h)=>q+h.q*invPx(h),0),cs=S.inv.filter(h=>h.cost>0),pl=cs.reduce((q,h)=>q+h.q*invPx(h)-h.cost,0);
@@ -481,29 +496,32 @@ function renderInv(){
   <div class="btns"><button onclick="saveInv(${i})">Save changes</button><button onclick="delInv(${i})">Delete holding</button></div></div>`}).join('');
  $('#inv').innerHTML=`<h2>Investments</h2><div class="card"><span class="mut">Total portfolio value (SGD)</span><br><b style="font-size:24px">${money(tot)}</b>${cs.length?`<br><span class="${pl>=0?'i':'e'}">${pl>=0?'Gain':'Loss'} ${money(pl)}</span> <span class="mut">on holdings with a cost entered</span>`:''}</div>
  <div class="btns"><button onclick="fetchPrices()">Refresh prices</button></div>
- <div class="mut" id="invst">${S.pxTs?'Crypto prices from CoinGecko, updated '+new Date(S.pxTs).toLocaleString():'No prices loaded yet.'}</div>
+ <div class="mut" id="invst">${S.pxTs?'Live crypto prices from Crypto.com Exchange, converted to SGD, updated '+new Date(S.pxTs).toLocaleString():'No prices loaded yet.'}</div>
+ <label>USD to SGD rate (auto-filled; edit to override)<input type="number" step="any" inputmode="decimal" value="${fxr()}" onchange="setFx(this.value)"></label>
  <div class="card">${rows||'<span class="mut">No holdings yet. Add one below.</span>'}</div>
  <h3>Add holding</h3>
  <label>Investment type<select id="it" onchange="invType()"><option>Crypto</option><option>Stocks</option><option>ETF</option><option>Gold</option><option>Other</option></select></label>
- <div id="ic"><label>Coin (top 50 by market cap)<select id="icn" onchange="invPrev()">${S.top.length?S.top.map(c=>`<option value="${c.id}">${c.rank}. ${esc(c.n)} (${c.sym})</option>`).join(''):'<option value="">Loading… tap Refresh prices</option>'}</select></label></div>
+ <div id="ic"><label>Search coin<input id="isr" placeholder="e.g. vechain, graph, polygon" oninput="fillCoins()"></label><label>Coin (top 100 by market cap)<select id="icn" onchange="invPrev()"></select></label></div>
  <div id="io" hidden><label>Name<input id="iname" placeholder="e.g. STI ETF"></label><label>Price per unit ($)<input id="ipx" type="number" step="any" inputmode="decimal" oninput="invPrev()"></label><div class="mut">Prices update automatically for crypto only. For other types, update the price yourself under +.</div></div>
  <label>Holdings (volume)<input id="iq" type="number" step="any" inputmode="decimal" oninput="invPrev()"></label>
  <label>Total cost paid ($, optional)<input id="icost" type="number" step="any" inputmode="decimal"></label>
  <div class="hint" id="iprev"></div><button class="pri" onclick="addInv()">Save holding</button>`;
- invPrev()}
+ fillCoins()}
+function fillCoins(){const q=($('#isr').value||'').toLowerCase().trim(),av=S.avail&&S.avail.length?S.avail:null,l=COINS.filter(c=>(!av||av.includes(c.s))&&(!q||(c.n+' '+c.s).toLowerCase().includes(q)));
+ $('#icn').innerHTML=l.map(c=>`<option value="${c.s}">${esc(c.n)} (${c.s})</option>`).join('')||'<option value="">No match</option>';invPrev()}
 function invType(){const c=$('#it').value==='Crypto';$('#ic').hidden=!c;$('#io').hidden=c;invPrev()}
-function invPrev(){const q=parseFloat($('#iq').value)||0,c=$('#it').value==='Crypto',p=c?((S.px[$('#icn').value]||{}).p||0):(parseFloat($('#ipx').value)||0);
+function invPrev(){const q=parseFloat($('#iq').value)||0,c=$('#it').value==='Crypto',p=c?((S.px[$('#icn').value]||{}).u||0)*fxr():(parseFloat($('#ipx').value)||0);
  $('#iprev').textContent=q>0&&p>0?`Price per unit ${money(p)} · Total value ${money(q*p)}`:(c&&p?`Price per unit ${money(p)}`:'')}
 function addInv(){const t=$('#it').value,q=parseFloat($('#iq').value),cost=parseFloat($('#icost').value)||0;
  if(!(q>0))return alert('Enter your holdings (volume).');
- if(t==='Crypto'){const co=S.top.find(c=>c.id===$('#icn').value);if(!co)return alert('Choose a coin. If the list is empty, tap Refresh prices.');
-  S.inv.push({id:Date.now(),t,cid:co.id,sym:co.sym,n:co.n,q,cost})}
+ if(t==='Crypto'){const co=COINS.find(c=>c.s===$('#icn').value);if(!co)return alert('Choose a coin.');
+  S.inv.push({id:Date.now(),t,cid:co.s,sym:co.s,n:co.n,q,cost})}
  else{const n=$('#iname').value.trim(),px=parseFloat($('#ipx').value);if(!n||!(px>0))return alert('Enter a name and price per unit.');S.inv.push({id:Date.now(),t,n,px,q,cost})}
  save();renderInv()}
 function saveInv(id){const h=S.inv.find(x=>x.id===id),q=parseFloat($('#vq'+id).value);if(!h||!(q>0))return alert('Enter your holdings (volume).');
  h.q=q;h.cost=parseFloat($('#vc'+id).value)||0;if(h.t!=='Crypto')h.px=parseFloat($('#vp'+id).value)||h.px;OP.delete('v'+id);save();renderInv()}
 function delInv(id){if(confirm('Delete this holding?')){S.inv=S.inv.filter(x=>x.id!==id);save();renderInv()}}
 
-buildAdd();go('rev');autoAI();
+buildAdd();go('rev');autoAI();if(S.inv.length&&(!S.pxTs||Date.now()-S.pxTs>3e5))fetchPrices();
 </script>
 </body></html>
