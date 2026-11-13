@@ -11,7 +11,7 @@
 @media(prefers-color-scheme:dark){:root{--bg:#0f161c;--card:#18222b;--ink:#e8edf1;--mut:#93a0ab;--acc:#3fb5a8;--exp:#e57a66;--inc:#3fb5a8;--line:#2a3743}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,"Segoe UI",sans-serif}
-body{padding:env(safe-area-inset-top) 0 calc(70px + env(safe-area-inset-bottom))}
+body{padding:0 0 calc(24px + env(safe-area-inset-bottom))}
 main{max-width:640px;margin:0 auto;padding:12px}
 section{display:none}section.on{display:block}
 h2,h3{margin:14px 0 8px;font-weight:650}h2{font-size:22px}h3{font-size:17px}
@@ -29,9 +29,10 @@ button{cursor:pointer;width:auto}
 .hint{font-size:13px;color:var(--acc);min-height:18px;margin-top:4px}
 .ban{background:#b4412f;color:#fff;padding:10px 14px;font-size:14px}
 .ban div{max-width:640px;margin:auto}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;min-width:0;border:0;border-radius:0;margin:0;padding:12px 0;background:none;font-size:11px;color:var(--mut)}
-nav .on{color:var(--acc);font-weight:700}
+#top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--card);border-bottom:1px solid var(--line)}
+#tabsel{width:auto;margin:0;padding:8px 10px;font-weight:600;color:var(--acc)}
+.pl{width:auto;margin:0 0 0 6px;padding:3px 12px;border-radius:8px;font-weight:700}
+.gp{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gc{text-align:center;margin:0}.gc svg{display:block;margin:0 auto 6px}
 .bar{height:8px;background:var(--line);border-radius:5px;overflow:hidden;margin:6px 0}
 .bar i{display:block;height:100%;background:var(--acc)}.bar.bad i{background:var(--exp)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;font-size:13px}
@@ -42,6 +43,7 @@ nav .on{color:var(--acc);font-weight:700}
 ul{padding-left:18px;margin:6px 0}
 </style></head>
 <body>
+<div id="top"><b>My Ledger</b><select id="tabsel" onchange="go(this.value)"></select></div>
 <div id="ban" class="ban" hidden></div>
 <main>
 <section id="add" class="on"></section>
@@ -51,29 +53,30 @@ ul{padding-left:18px;margin:6px 0}
 <section id="rev"></section>
 <section id="acct"></section>
 <section id="debt"></section>
+<section id="inv"></section>
 </main>
-<nav id="nav"></nav>
+
 <script>
-const CATS={Food:["Breakfast","Lunch","Dinner","Coffee","Snacks"],
-Transportation:["Grab/Taxi","Car repair","Petrol","Cashcard","Car insurance","Road tax"],
-Household:["Family Contribution","Patcharin's saving","Groceries","Household product"],
-Personal:["Clothing","Shoes","Luxury goods","Medical","Gym","Massage","Supplements","Skincare products","Facial","Hair","Health insurance: Accident","Health insurance: Hospitalisation","Health insurance: Term","Health insurance: Life"],
-Vacation:["Flights","Hotel","General expenses"],
-Gambling:["4D","Singapore Pools","Toto"],
-Charity:["Donations"]};
-const INC=["Salary","Petty Cash","Investment Returns","Bonus","Winnings"];
+const CATS={Food:["Breakfast","Lunch","Dinner","Coffee","Snacks","Others"],
+Transportation:["Grab/Taxi","Car repair","Petrol","Cashcard","Parking","Car insurance","Road tax","Others"],
+Household:["Family Contribution","Patcharin's saving","Groceries","Household product","Others"],
+Personal:["Clothing","Shoes","Luxury goods","Medical","Gym","Massage","Supplements","Skincare products","Facial","Hair","Health insurance: Accident","Health insurance: Hospitalisation","Health insurance: Term","Health insurance: Life","Books","Gifts","Parent Retirement Contribution","Others"],
+Vacation:["Flights","Hotel","General expenses","Others"],
+Gambling:["4D","Singapore Pools","Toto","Others"],
+Charity:["Donations","Others"]};
+const INC=["Salary","Petty Cash","Investment Returns","Bonus","Winnings","Others"];
 const MONTHS=[3,6,9,12,24,36,48,60];
 const isCard=a=>(ACCTS.find(x=>x[0]===a)||[])[1]==='card';
 const ACCTS=[["Cash on Hand","cash"],["POSB Account","bank"],["OCBC 360 Account","bank"],["POSB Everyday Credit Card","card"],["OCBC NXT Credit Card","card"],["TRUST Credit Card","card"]];
 function aopts(t,sel,all){const o=f=>ACCTS.filter(x=>f(x[1])).map(x=>`<option${x[0]===sel?' selected':''}>${esc(x[0])}</option>`).join('');
  return '<option value="">Choose account…</option>'+(all?o(()=>true):t==='income'?o(k=>k!=='card'):`<optgroup label="Debit from">${o(k=>k!=='card')}</optgroup><optgroup label="Charge to card">${o(k=>k==='card')}</optgroup>`)}
-const KW=[[/grabfood|foodpanda|deliveroo|dinner|restaurant|supper/,'Food|Dinner'],[/breakfast|kaya|toast|kopi/,'Food|Breakfast'],[/lunch|hawker|kopitiam|food court/,'Food|Lunch'],
+const KW=[[/retirement/,'Personal|Parent Retirement Contribution'],[/grabfood|foodpanda|deliveroo|dinner|restaurant|supper/,'Food|Dinner'],[/breakfast|kaya|toast|kopi/,'Food|Breakfast'],[/lunch|hawker|kopitiam|food court/,'Food|Lunch'],
 [/coffee|starbucks|cafe|latte|tea|boba|liho|koi/,'Food|Coffee'],[/snack|biscuit|chips|ice cream|dessert/,'Food|Snacks'],
-[/grab|taxi|gojek|comfortdelgro|uber|ryde/,'Transportation|Grab/Taxi'],[/petrol|shell|esso|spc|caltex/,'Transportation|Petrol'],[/cashcard|erp|parking/,'Transportation|Cashcard'],
+[/grab|taxi|gojek|comfortdelgro|uber|ryde/,'Transportation|Grab/Taxi'],[/petrol|shell|esso|spc|caltex/,'Transportation|Petrol'],[/cashcard|erp/,'Transportation|Cashcard'],[/parking|carpark/,'Transportation|Parking'],
 [/workshop|servicing|tyre|car repair/,'Transportation|Car repair'],[/road tax/,'Transportation|Road tax'],[/car insurance/,'Transportation|Car insurance'],
 [/patcharin/,"Household|Patcharin's saving"],[/mum|mom|dad|parents|family|allowance/,'Household|Family Contribution'],[/ntuc|fairprice|cold storage|sheng siong|grocer|giant|market/,'Household|Groceries'],[/detergent|tissue|household|ikea/,'Household|Household product'],
 [/hospitali[sz]ation|medishield|integrated shield|ip rider/,'Personal|Health insurance: Hospitalisation'],[/term insurance|term life|term plan/,'Personal|Health insurance: Term'],[/life insurance|whole life|\baia\b|prudential|great eastern|manulife|income insurance/,'Personal|Health insurance: Life'],[/accident|pa insurance|personal accident/,'Personal|Health insurance: Accident'],
-[/shirt|dress|clothes|uniqlo|zara|h&m|pants/,'Personal|Clothing'],[/shoe|sneaker|nike|adidas/,'Personal|Shoes'],[/gucci|lv|louis|prada|hermes|luxury/,'Personal|Luxury goods'],
+[/\bbooks?\b|kinokuniya|bookstore/,'Personal|Books'],[/\bgifts?\b|birthday/,'Personal|Gifts'],[/shirt|dress|clothes|uniqlo|zara|h&m|pants/,'Personal|Clothing'],[/shoe|sneaker|nike|adidas/,'Personal|Shoes'],[/gucci|lv|louis|prada|hermes|luxury/,'Personal|Luxury goods'],
 [/doctor|clinic|hospital|medicine|dental|pharmacy|guardian/,'Personal|Medical'],[/gym|fitness|anytime/,'Personal|Gym'],[/massage|spa/,'Personal|Massage'],[/vitamin|supplement|protein/,'Personal|Supplements'],
 [/facial/,'Personal|Facial'],[/skincare|serum|cleanser|moisturi|sunscreen|sephora/,'Personal|Skincare products'],[/haircut|hair|salon|barber/,'Personal|Hair'],
 [/flight|airline|scoot|airasia|singapore air|changi/,'Vacation|Flights'],[/hotel|airbnb|agoda|booking\.com|resort/,'Vacation|Hotel'],[/trip|holiday|vacation|souvenir/,'Vacation|General expenses'],
@@ -89,7 +92,7 @@ const parse=s=>new Date(s+'T00:00');
 const lab=v=>v.replace('|',' › ');
 const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 let S;try{S=JSON.parse(localStorage.getItem('ledger'))}catch(e){}
-S=S||{};S.tx=S.tx||[];S.rec=S.rec||[];S.goals=S.goals||[];S.rules=S.rules||{};S.xfer=S.xfer||[];S.open=S.open||{};S.cyc=S.cyc||{};S.last=S.last||{};S.debts=S.debts||[];S.lim=S.lim||{};
+S=S||{};S.tx=S.tx||[];S.rec=S.rec||[];S.goals=S.goals||[];S.rules=S.rules||{};S.xfer=S.xfer||[];S.open=S.open||{};S.cyc=S.cyc||{};S.last=S.last||{};S.debts=S.debts||[];S.lim=S.lim||{};S.inv=S.inv||[];S.px=S.px||{};S.top=S.top||[];
 function save(){try{localStorage.setItem('ledger',JSON.stringify(S))}catch(e){alert('Could not save data on this device.')}}
 if(!S.seed2){Object.assign(S.cyc,{"OCBC NXT Credit Card":{s:27,d:19},"POSB Everyday Credit Card":{s:23,d:17},"TRUST Credit Card":{s:3,d:18}});
  Object.assign(S.lim,{"OCBC NXT Credit Card":22400,"POSB Everyday Credit Card":17500,"TRUST Credit Card":34000});S.seed2=1}
@@ -114,10 +117,11 @@ function addM(b,k){const t=new Date(b.getFullYear(),b.getMonth()+k,1);t.setDate(
 function dl(name,mime,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
 
 /* ---------- nav & banner ---------- */
-const TABS=[['rev','Overview'],['add','Add'],['log','Log'],['rec','Recurring'],['acct','Accounts'],['debt','Debt'],['goals','Goals']];
+const TABS=[['rev','Overview'],['add','Add'],['log','Log'],['rec','Recurring'],['acct','Accounts'],['debt','Debt'],['inv','Investments'],['goals','Goals']];
+$('#tabsel').innerHTML=TABS.map(([k,n])=>`<option value="${k}">${n}</option>`).join('');
 function go(t){syncInst();tab=t;document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===t));
- $('#nav').innerHTML=TABS.map(([k,n])=>`<button class="${k===t?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
- ({add:recent,log:renderLog,rec:renderRec,acct:renderAcct,debt:renderDebt,goals:renderGoals,rev:renderRev})[t]();banner();window.scrollTo(0,0)}
+ $('#tabsel').value=t;
+ ({add:recent,log:renderLog,rec:renderRec,acct:renderAcct,debt:renderDebt,inv:renderInv,goals:renderGoals,rev:renderRev})[t]();banner();window.scrollTo(0,0)}
 function banner(){
  const due=S.rec.filter(r=>days(r.due)<=r.rem).sort((a,b)=>a.due<b.due?-1:1);
  const cl=[];ACCTS.forEach(([a,k])=>{if(k!=='card')return;const i=cardInfo(a);if(!i||i.out<0.005||i.last<=0)return;const d=Math.round((i.due-parse(today()))/864e5);
@@ -172,7 +176,7 @@ function renderLog(){
  $('#log').innerHTML=`<h2>Log</h2><input type="month" value="${logM}" onchange="logM=this.value||logM;renderLog()">
  <div class="card two"><div><span class="mut">Income</span><br><b class="i">${money(s.inc)}</b></div><div><span class="mut">Expenses</span><br><b class="e">${money(s.exp)}</b></div></div>
  <div class="card">${l.length?l.map(x=>`<div class="row"><div>${esc(x.d||'(no description)')}<small>${x.date} · ${esc(x.ac||'No account')}${x.ik?' · installment '+x.ik:''}</small><select onchange="recat(${x.id},this.value)">${opts(x.t,x.c)}</select> <select onchange="reacc(${x.id},this.value)">${aopts(x.t,x.ac)}</select></div>
- <span class="${x.t==='income'?'i':'e'}">${x.t==='income'?'+':'-'}${money(x.a)}<button class="x" onclick="delTx(${x.id})">✕</button></span></div>`).join(''):'<span class="mut">No entries this month.</span>'}</div>`;
+ <span class="${x.t==='income'?'i':'e'}">${x.t==='income'?'+':'-'}${money(x.a)}<button class="pl" onclick="tg('e${x.id}')">+</button><button class="x" onclick="delTx(${x.id})">✕</button></span></div>${txEdit(x)}`).join(''):'<span class="mut">No entries this month.</span>'}</div>`;
 }
 function recat(id,v){const x=S.tx.find(t=>t.id===id);if(!x)return;x.c=v;if(x.d)S.rules[x.d.toLowerCase()]=v;save()}
 function reacc(id,v){const x=S.tx.find(t=>t.id===id);if(x){x.ac=v;save()}}
@@ -233,10 +237,8 @@ function goalStat(g,endM){
 function renderGoals(){
  const gl=S.goals.filter(g=>g.y===gY),now=today().slice(0,7);
  $('#goals').innerHTML=`<h2>Yearly goals</h2><div class="two"><button onclick="gY--;renderGoals()">‹ ${gY-1}</button><button onclick="gY++;renderGoals()">${gY+1} ›</button></div>
- <h3 style="text-align:center">${gY}</h3>
- ${gl.length?gl.map(g=>{const s=goalStat(g,now);return `<div class="card"><div class="row" style="border:0;padding:0"><b>${esc(g.n)}</b><button class="x" onclick="delGoal(${g.id})">✕</button></div>
- <div class="mut">${g.k==='cap'?'Spend at most':g.k==='inc'?'Earn at least':'Save at least'} ${money(g.a)}${g.k==='cap'?' ('+(g.s==='all'?'all expenses':g.s)+')':''}</div>
- <div class="bar ${s.bad?'bad':''}"><i style="width:${s.pct}%"></i></div><div>${money(s.act)} so far — ${s.st}</div></div>`}).join(''):'<div class="card mut">No goals for this year yet. Add one below.</div>'}
+ <h3 style="text-align:center">${gY}</h3><div class="mut" style="text-align:center">Pie = progress. Green on track · Amber off pace · Red over limit or well behind</div>
+ ${gl.length?'<div class="gp">'+gl.map(g=>goalPie(g,now)).join('')+'</div>':'<div class="card mut">No goals for this year yet. Add one below.</div>'}
  <h3>Add goal for ${gY}</h3>
  <label>Name<input id="gn" placeholder="e.g. Save for holiday"></label>
  <label>Type<select id="gk" onchange="$('#gsw').hidden=this.value!=='cap'"><option value="sav">Save at least (income − expenses)</option><option value="inc">Earn at least (income)</option><option value="cap">Spend at most (expenses)</option></select></label>
@@ -268,7 +270,7 @@ function review(){
 function renderRev(){
  const {c,p,cats,adv}=review();
  $('#rev').innerHTML=`<h2>Monthly overview</h2><input type="month" value="${revM}" onchange="revM=this.value||revM;renderRev()">
- <div class="card two"><div><span class="mut">Income</span><br><b class="i">${money(c.inc)}</b></div><div><span class="mut">Expenses</span><br><b class="e">${money(c.exp)}</b></div></div>
+ ${pieCard(c)}
  <div class="card"><b>Net: ${money(c.inc-c.exp)}</b><div class="mut">Last month: income ${money(p.inc)}, expenses ${money(p.exp)}</div></div>
  <div class="card"><span class="mut">Monthly debt repayments</span><br><b class="e">${money(debtMonthly())}</b>${c.inc?' <span class="mut">('+Math.round(debtMonthly()/c.inc*100)+'% of income)</span>':''}</div>
  ${chartHTML()}
@@ -286,7 +288,7 @@ function csvOut(){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
  dl('ledger.csv','text/csv',['Date,Type,Amount,Category,Account,Description'].concat(S.tx.slice().sort((a,b)=>a.date<b.date?-1:1).map(x=>[x.date,x.t,x.a,q(lab(x.c)),q(x.ac||''),q(x.d)].join(','))).join('\n'))}
 function jsonOut(){dl('ledger-backup-'+today()+'.json','application/json',JSON.stringify(Object.assign({},S,{cfg:undefined})))}
 function jsonIn(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.tx))throw 0;
- if(confirm('Replace all current data with this backup?')){S={tx:d.tx,rec:d.rec||[],goals:d.goals||[],rules:d.rules||{},xfer:d.xfer||[],open:d.open||{},cyc:d.cyc||{},last:d.last||{},debts:d.debts||[],lim:d.lim||{},cfg:S.cfg,aiH:d.aiH||[]};save();go('rev')}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
+ if(confirm('Replace all current data with this backup?')){S={tx:d.tx,rec:d.rec||[],goals:d.goals||[],rules:d.rules||{},xfer:d.xfer||[],open:d.open||{},cyc:d.cyc||{},last:d.last||{},debts:d.debts||[],lim:d.lim||{},cfg:S.cfg,aiH:d.aiH||[],inv:d.inv||[],px:d.px||{},top:d.top||[]};save();go('rev')}}catch(e){alert('That file is not a valid backup.')}};r.readAsText(f)}
 
 /* ---------- ACCOUNTS ---------- */
 const dt=(y,m,d)=>new Date(y,m,Math.min(d,new Date(y,m+1,0).getDate()));
@@ -299,17 +301,18 @@ function cardInfo(a){const c=S.cyc[a];if(!c||!c.s||!c.d)return null;
  let due=dt(p.getFullYear(),p.getMonth(),c.d);if(due<=p)due=dt(p.getFullYear(),p.getMonth()+1,c.d);
  return {cur:sum(p,n),close:n,last:sum(pp,p),due,out:-bal(a)}}
 function renderAcct(){
- const rows=ACCTS.map(([a,k])=>{
-  const head=(v,cls)=>`<div class="row" style="border:0;padding:0"><b>${esc(a)}</b><b class="${cls}">${v}</b></div>`;
+ const rows=ACCTS.map(([a,k],n)=>{
+  const id='ac'+n,tgb=`<button class="pl" onclick="tg('${id}')">${k==='card'?'Details':'+'}</button>`;
   const open=`<label>Opening balance ($)${k==='card'?' (enter negative if you already owe)':''}<input type="number" inputmode="decimal" step="0.01" value="${S.open[a]||''}" onchange="setOpen('${a}',this.value)"></label>`;
-  if(k!=='card')return `<div class="card">${head(money(bal(a)),bal(a)<0?'e':'i')}${open}</div>`;
+  const head=(v,cls)=>`<div class="row" style="border:0;padding:0"><b>${esc(a)}</b><span><b class="${cls}">${v}</b>${tgb}</span></div>`;
+  if(k!=='card')return `<div class="card">${head(money(bal(a)),bal(a)<0?'e':'i')}<div id="${id}" ${hid(id)}>${open}</div></div>`;
   const i=cardInfo(a),c=S.cyc[a]||{},L=S.lim[a]||0,u=-bal(a);
-  return `<div class="card">${head(money(-bal(a))+' owed','e')}
+  return `<div class="card">${head(money(u),'e')}<div id="${id}" ${hid(id)}>
   ${L?`<div class="bar ${u/L>0.8?'bad':''}"><i style="width:${Math.max(0,Math.min(100,u/L*100))}%"></i></div><div class="mut">Limit ${money(L)} · available ${money(L-u)}</div>`:''}
   ${i?`<div class="mut">This cycle: ${money(i.cur)} (statement on ${fd(i.close)})</div><div>Last statement: ${money(i.last)} — pay by ${fd(i.due)}</div>`:'<div class="mut">Set the billing cycle below.</div>'}
   <div class="two"><label>Statement day (1-31)<input type="number" inputmode="numeric" min="1" max="31" value="${c.s||''}" onchange="setCyc('${a}','s',this.value)"></label>
   <label>Payment due day (1-31)<input type="number" inputmode="numeric" min="1" max="31" value="${c.d||''}" onchange="setCyc('${a}','d',this.value)"></label></div>
-  <label>Credit limit ($)<input type="number" inputmode="decimal" step="1" value="${L||''}" onchange="setLim('${a}',this.value)"></label>${open}</div>`}).join('');
+  <label>Credit limit ($)<input type="number" inputmode="decimal" step="1" value="${L||''}" onchange="setLim('${a}',this.value)"></label>${open}</div></div>`}).join('');
  const xs=[...S.xfer].sort((a,b)=>a.date<b.date?1:-1).slice(0,8);
  $('#acct').innerHTML=`<h2>Accounts</h2>${rows}
  <h3>Pay card bill or move money</h3>
@@ -339,12 +342,13 @@ function syncInst(){let ch=0;S.debts.forEach(d=>{if(d.k!=='Installment')return;f
 function renderDebt(){
  const tot=S.debts.reduce((q,d)=>q+remain(d),0);
  $('#debt').innerHTML=`<h2>Debt</h2><div class="card two"><div><span class="mut">Monthly repayments</span><br><b class="e">${money(debtMonthly())}</b></div><div><span class="mut">Total remaining</span><br><b class="e">${money(tot)}</b></div></div>
- ${S.debts.length?S.debts.map(d=>{const k=paidCount(d),done=k>=d.m,nx=done?null:(d.k==='Installment'?instDate(d,k):addM(parse(d.st),k));return `<div class="card"><div class="row" style="border:0;padding:0"><b>${esc(d.n)}</b><button class="x" onclick="delDebt(${d.id})">✕</button></div>
+ ${S.debts.length?S.debts.map(d=>{const k=paidCount(d),done=k>=d.m,nx=done?null:(d.k==='Installment'?instDate(d,k):addM(parse(d.st),k));return `<div class="card"><div class="row" style="border:0;padding:0"><b>${esc(d.n)}</b><span><button class="pl" onclick="tg('d${d.id}')">+</button><button class="x" onclick="delDebt(${d.id})">✕</button></span></div>
  <div class="mut">${dLab(d.k)} · ${esc(d.ac||'')} · ${d.m} months${d.r?' · '+d.r+'% p.a.':''}</div>
  <div class="bar"><i style="width:${Math.min(100,k/d.m*100)}%"></i></div>
  <div>${k} of ${d.m} paid · ${money(d.pm)}/month · ${money(remain(d))} left</div>
  <div class="mut">${done?'Fully paid':'Next due '+fd(nx)+' '+nx.getFullYear()}</div>
- ${!done&&d.k!=='Installment'?`<button onclick="payDebt(${d.id})">Mark this month paid</button>`:''}</div>`}).join(''):'<div class="card mut">No debts yet. Add one below, or record a card installment on the Add tab.</div>'}
+ ${!done&&d.k!=='Installment'?`<button onclick="payDebt(${d.id})">Mark this month paid</button>`:''}
+ ${debtEdit(d)}</div>`}).join(''):'<div class="card mut">No debts yet. Add one below, or record a card installment on the Add tab.</div>'}
  <h3>Add debt</h3>
  <label>Name<input id="dn" placeholder="e.g. Car loan"></label>
  <label>Type<select id="dk"><optgroup label="Bank loan"><option value="Personal">Personal loan</option><option value="Car">Car loan</option><option value="House">House loan</option><option value="Renovation">Renovation loan</option><option value="Others">Other bank loan</option></optgroup><option value="Installment">Credit card installment plan</option></select></label>
@@ -407,7 +411,7 @@ function aiData(){
   creditCards:ACCTS.filter(x=>x[1]==='card').map(([a])=>{const i=cardInfo(a);return {name:a,owed:r2(-bal(a)),limit:S.lim[a]||0,lastStatement:i?r2(i.last):null,paymentDue:i?iso(i.due):null}}),
   accounts:ACCTS.filter(x=>x[1]!=='card').map(([a])=>({name:a,balance:r2(bal(a))})),
   debts:S.debts.filter(x=>paidCount(x)<x.m).map(x=>({type:dLab(x.k),monthly:x.pm,remaining:r2(remain(x)),monthsLeft:x.m-paidCount(x)})),
-  recurringDueIn14Days:S.rec.filter(r=>days(r.due)<=14).map(r=>({name:r.n,amount:r.a,due:r.due}))}}
+  investments:S.inv.map(h=>({name:h.n,value:r2(h.q*invPx(h))})),recurringDueIn14Days:S.rec.filter(r=>days(r.due)<=14).map(r=>({name:r.n,amount:r.a,due:r.due}))}}
 async function runAI(man){const c=S.cfg||{};
  if(!c.url||!c.key){if(man)alert('Paste your Worker URL and app password under Settings, tap Save settings, then try again.');return}
  const el=$('#aiT');if(el)el.textContent='Reviewing your finances…';
@@ -418,6 +422,87 @@ async function runAI(man){const c=S.cfg||{};
 function autoAI(){const c=S.cfg||{},h=(S.aiH||[])[0];if(c.url&&c.key&&S.aiTry!==today()&&(!h||days(h.date)<=-7)){S.aiTry=today();save();runAI(false)}}
 function icsWeekly(){const d=new Date();d.setDate(d.getDate()+(7-d.getDay())%7);const x=iso(d).replace(/-/g,'');
  dl('ledger-weekly.ics','text/calendar',['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Ledger//EN','BEGIN:VEVENT','UID:weekly@ledger','DTSTAMP:'+x+'T000000Z','DTSTART:'+x+'T200000','DTEND:'+x+'T201500','RRULE:FREQ=WEEKLY;BYDAY=SU','SUMMARY:Open Ledger for weekly AI review','BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Weekly review','TRIGGER:PT0S','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n'))}
+
+/* ---------- EDIT / TOGGLE / PIE ---------- */
+const OP=new Set(),hid=id=>OP.has(id)?'':'hidden';
+function tg(id){const e=$('#'+id);if(!e)return;e.hidden=!e.hidden;e.hidden?OP.delete(id):OP.add(id)}
+function txEdit(x){return `<div id="e${x.id}" ${hid('e'+x.id)} class="card" style="margin:4px 0 8px"><div class="two"><label>Description<input id="ed${x.id}" value="${esc(x.d||'')}"></label><label>Amount ($)<input id="ea${x.id}" type="number" inputmode="decimal" step="0.01" value="${x.a}"></label></div>
+ <label>Date<input id="et${x.id}" type="date" value="${x.date}"></label><button class="pri" onclick="saveEdit(${x.id})">Save changes</button></div>`}
+function saveEdit(id){const x=S.tx.find(t=>t.id===id),a=parseFloat($('#ea'+id).value);if(!x||!(a>0))return alert('Enter an amount above 0.');
+ x.d=$('#ed'+id).value.trim();x.a=a;x.date=$('#et'+id).value||x.date;OP.delete('e'+id);save();renderLog()}
+function debtEdit(d){const i=d.id,ins=d.k==='Installment';
+ return `<div id="d${i}" ${hid('d'+i)} style="margin-top:8px"><label>Name<input id="xn${i}" value="${esc(d.n)}"></label>
+ <div class="two"><label>Amount ($)<input id="xp${i}" type="number" inputmode="decimal" step="0.01" value="${d.p}"></label><label>Tenure (months)<select id="xm${i}">${MONTHS.map(m=>`<option${m===d.m?' selected':''}>${m}</option>`).join('')}</select></label></div>
+ <div class="two"><label>Interest % p.a.<input id="xr${i}" type="number" inputmode="decimal" step="0.01" value="${d.r||0}"></label><label>Monthly payment ($)<input id="xq${i}" type="number" inputmode="decimal" step="0.01" value="${d.pm}"></label></div>
+ <div class="two"><label>First payment / purchase date<input id="xs${i}" type="date" value="${d.st}"></label><label>Bank account or card<select id="xa${i}">${aopts('',d.ac,true)}</select></label></div>
+ ${ins?`<label>Category<select id="xc${i}">${opts('expense',d.c)}</select></label><div class="mut">Saving rebuilds this plan's automatic entries.</div>`:`<label>Payments made<input id="xd${i}" type="number" inputmode="numeric" min="0" value="${d.paid||0}"></label>`}
+ <button class="pri" onclick="saveDebtEdit(${i})">Save changes</button></div>`}
+function saveDebtEdit(id){const d=S.debts.find(x=>x.id===id);if(!d)return;const g=k=>$('#'+k+id).value,ins=d.k==='Installment';
+ const n=g('xn').trim(),p=parseFloat(g('xp')),m=+g('xm'),r=parseFloat(g('xr'))||0,ac=g('xa');
+ if(!n||!(p>0)||!ac)return alert('Enter a name, amount and account.');
+ if(ins&&!isCard(ac))return alert('Installment plans need a credit card.');if(!ins&&isCard(ac))return alert('Loans are paid from a bank account or cash.');
+ if(ins&&!g('xc'))return alert('Choose a category.');
+ Object.assign(d,{n,p,m,r,ac,st:g('xs')||d.st,pm:Math.round((parseFloat(g('xq'))||payAmt(p,m,r))*100)/100});
+ if(ins){d.c=g('xc');S.tx=S.tx.filter(x=>x.plan!==id);syncInst()}else d.paid=Math.min(m,parseInt(g('xd'))||0);
+ OP.delete('d'+id);save();renderDebt();banner()}
+function goalPie(g,now){const s=goalStat(g,now),pc=s.pct,C=157.08,over=g.k==='cap'&&s.act>g.a;
+ const col=over?'#c0392b':!s.bad?'#2e9e6b':(g.k==='cap'||s.act>=s.pace*.7)?'#e0a030':'#c0392b';
+ return `<div class="card gc"><svg viewBox="0 0 100 100" width="110" height="110"><circle cx="50" cy="50" r="50" style="fill:var(--line)"/>${pc>=99.9?`<circle cx="50" cy="50" r="50" fill="${col}"/>`:`<circle cx="50" cy="50" r="25" fill="none" stroke="${col}" stroke-width="50" stroke-dasharray="${pc/100*C} ${C}" transform="rotate(-90 50 50)"/>`}</svg>
+ <b>${esc(g.n)}</b><div style="font-size:20px;font-weight:700;color:${col}">${Math.round(pc)}%</div><div class="mut">${money(s.act)} of ${money(g.a)}</div>
+ <div class="mut">${g.k==='cap'?'Spend limit'+(g.s==='all'?'':' · '+g.s):g.k==='inc'?'Income goal':'Savings goal'}</div><div class="mut">${s.st}</div><button class="x" onclick="delGoal(${g.id})">✕ Delete</button></div>`}
+
+/* ---------- OVERVIEW PIE ---------- */
+function pieCard(c){const t=c.inc+c.exp,C=157.08,f=t>0?c.inc/t*C:0,pc=v=>t?` <span class="mut">${Math.round(v/t*100)}%</span>`:'';
+ return `<div class="card" style="display:flex;align-items:center;gap:14px"><svg viewBox="0 0 100 100" width="120" height="120" style="flex:none"><circle cx="50" cy="50" r="50" fill="${t>0?'#c0392b':'var(--line)'}"/>${t>0?`<circle cx="50" cy="50" r="25" fill="none" stroke="#2e9e6b" stroke-width="50" stroke-dasharray="${f} ${C}" transform="rotate(-90 50 50)"/>`:''}</svg>
+ <div><div><span style="color:#2e9e6b">●</span> Income<br><b style="color:#2e9e6b">${money(c.inc)}</b>${pc(c.inc)}</div>
+ <div style="margin-top:8px"><span style="color:#c0392b">●</span> Expenses<br><b style="color:#c0392b">${money(c.exp)}</b>${pc(c.exp)}</div></div></div>`}
+
+/* ---------- INVESTMENTS ---------- */
+let pxTry=0;
+const invPx=h=>h.t==='Crypto'?((S.px[h.cid]||{}).p||0):(h.px||0);
+async function fetchPrices(){
+ const st=$('#invst');if(st)st.textContent='Updating prices…';
+ try{const r=await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=sgd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h');
+  if(!r.ok)throw new Error(r.status===429?'too many requests, try again in a minute':'error '+r.status);
+  const j=await r.json();S.top=j.map(c=>({id:c.id,sym:c.symbol.toUpperCase(),n:c.name,rank:c.market_cap_rank}));
+  j.forEach(c=>S.px[c.id]={p:c.current_price,ch:c.price_change_percentage_24h});S.pxTs=Date.now();save()}
+ catch(e){const m=$('#invst');if(m)m.textContent='Could not update prices ('+e.message+'). Showing the last saved prices.';return}
+ if(tab==='inv'&&!($('#iq')&&$('#iq').value))renderInv();else{const m=$('#invst');if(m)m.textContent='Prices updated.'}}
+function renderInv(){
+ if((!S.pxTs||Date.now()-S.pxTs>3e5)&&Date.now()-pxTry>6e4){pxTry=Date.now();fetchPrices()}
+ const tot=S.inv.reduce((q,h)=>q+h.q*invPx(h),0),cs=S.inv.filter(h=>h.cost>0),pl=cs.reduce((q,h)=>q+h.q*invPx(h)-h.cost,0);
+ const rows=S.inv.map(h=>{const u=invPx(h),v=h.q*u,ch=h.t==='Crypto'?(S.px[h.cid]||{}).ch:null,i=h.id;
+  return `<div class="row"><div><b>${esc(h.n)}${h.sym?' ('+h.sym+')':''}</b><small>${h.t} · ${h.q} × ${money(u)}${ch!=null?` <span class="${ch>=0?'i':'e'}">${ch>=0?'+':''}${ch.toFixed(1)}% 24h</span>`:''}</small>
+  <small>${tot?Math.round(v/tot*100):0}% of portfolio${h.cost>0?` · ${v-h.cost>=0?'gain':'loss'} <span class="${v-h.cost>=0?'i':'e'}">${money(v-h.cost)}</span>`:''}</small></div>
+  <span><b>${money(v)}</b><button class="pl" onclick="tg('v${i}')">+</button></span></div>
+  <div id="v${i}" ${hid('v'+i)} class="card" style="margin:4px 0 8px"><label>Holdings (volume)<input id="vq${i}" type="number" step="any" inputmode="decimal" value="${h.q}"></label>
+  ${h.t==='Crypto'?'':`<label>Price per unit ($)<input id="vp${i}" type="number" step="any" inputmode="decimal" value="${h.px||''}"></label>`}
+  <label>Total cost paid ($, optional)<input id="vc${i}" type="number" step="any" inputmode="decimal" value="${h.cost||''}"></label>
+  <div class="btns"><button onclick="saveInv(${i})">Save changes</button><button onclick="delInv(${i})">Delete holding</button></div></div>`}).join('');
+ $('#inv').innerHTML=`<h2>Investments</h2><div class="card"><span class="mut">Total portfolio value (SGD)</span><br><b style="font-size:24px">${money(tot)}</b>${cs.length?`<br><span class="${pl>=0?'i':'e'}">${pl>=0?'Gain':'Loss'} ${money(pl)}</span> <span class="mut">on holdings with a cost entered</span>`:''}</div>
+ <div class="btns"><button onclick="fetchPrices()">Refresh prices</button></div>
+ <div class="mut" id="invst">${S.pxTs?'Crypto prices from CoinGecko, updated '+new Date(S.pxTs).toLocaleString():'No prices loaded yet.'}</div>
+ <div class="card">${rows||'<span class="mut">No holdings yet. Add one below.</span>'}</div>
+ <h3>Add holding</h3>
+ <label>Investment type<select id="it" onchange="invType()"><option>Crypto</option><option>Stocks</option><option>ETF</option><option>Gold</option><option>Other</option></select></label>
+ <div id="ic"><label>Coin (top 50 by market cap)<select id="icn" onchange="invPrev()">${S.top.length?S.top.map(c=>`<option value="${c.id}">${c.rank}. ${esc(c.n)} (${c.sym})</option>`).join(''):'<option value="">Loading… tap Refresh prices</option>'}</select></label></div>
+ <div id="io" hidden><label>Name<input id="iname" placeholder="e.g. STI ETF"></label><label>Price per unit ($)<input id="ipx" type="number" step="any" inputmode="decimal" oninput="invPrev()"></label><div class="mut">Prices update automatically for crypto only. For other types, update the price yourself under +.</div></div>
+ <label>Holdings (volume)<input id="iq" type="number" step="any" inputmode="decimal" oninput="invPrev()"></label>
+ <label>Total cost paid ($, optional)<input id="icost" type="number" step="any" inputmode="decimal"></label>
+ <div class="hint" id="iprev"></div><button class="pri" onclick="addInv()">Save holding</button>`;
+ invPrev()}
+function invType(){const c=$('#it').value==='Crypto';$('#ic').hidden=!c;$('#io').hidden=c;invPrev()}
+function invPrev(){const q=parseFloat($('#iq').value)||0,c=$('#it').value==='Crypto',p=c?((S.px[$('#icn').value]||{}).p||0):(parseFloat($('#ipx').value)||0);
+ $('#iprev').textContent=q>0&&p>0?`Price per unit ${money(p)} · Total value ${money(q*p)}`:(c&&p?`Price per unit ${money(p)}`:'')}
+function addInv(){const t=$('#it').value,q=parseFloat($('#iq').value),cost=parseFloat($('#icost').value)||0;
+ if(!(q>0))return alert('Enter your holdings (volume).');
+ if(t==='Crypto'){const co=S.top.find(c=>c.id===$('#icn').value);if(!co)return alert('Choose a coin. If the list is empty, tap Refresh prices.');
+  S.inv.push({id:Date.now(),t,cid:co.id,sym:co.sym,n:co.n,q,cost})}
+ else{const n=$('#iname').value.trim(),px=parseFloat($('#ipx').value);if(!n||!(px>0))return alert('Enter a name and price per unit.');S.inv.push({id:Date.now(),t,n,px,q,cost})}
+ save();renderInv()}
+function saveInv(id){const h=S.inv.find(x=>x.id===id),q=parseFloat($('#vq'+id).value);if(!h||!(q>0))return alert('Enter your holdings (volume).');
+ h.q=q;h.cost=parseFloat($('#vc'+id).value)||0;if(h.t!=='Crypto')h.px=parseFloat($('#vp'+id).value)||h.px;OP.delete('v'+id);save();renderInv()}
+function delInv(id){if(confirm('Delete this holding?')){S.inv=S.inv.filter(x=>x.id!==id);save();renderInv()}}
 
 buildAdd();go('rev');autoAI();
 </script>
